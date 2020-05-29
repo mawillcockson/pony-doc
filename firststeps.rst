@@ -163,12 +163,8 @@ For SQLite, either the database filename or the string ``':memory:'`` must be sp
 In this case, if the database file does not exist, it will be created. For this tutorial, we can use a database created in-memory.
 
 .. only:: comment
-    These adapters need links
-    psycopg2: <https://pypi.org/project/psycopg2/>
-    MySQLdb: <https://sourceforge.net/projects/mysql-python/> or <https://github.com/PyMySQL/mysqlclient-python>
-    pymysql: <https://github.com/PyMySQL/PyMySQL>
-    cx_Oracle: <https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html>
-    Does cockroachDB not need an adapter? If so, this should be explicitly mentioned.
+    This should use the same list as in the beginning of this page, or better, should link to that, to avoid copy-pasting.
+    Also, cockroachDB isn't listed here as needing an adapter, but is in the list at the beginning.
 
 If you're using another database, you need to have the specific database adapter installed. For PostgreSQL Pony uses ``psycopg2``. For MySQL, either ``MySQLdb`` or ``pymysql`` adapter. For Oracle, Pony uses the ``cx_Oracle`` adapter.
 
