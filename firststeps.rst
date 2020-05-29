@@ -4,13 +4,13 @@ Getting Started with Pony
 Installing
 ----------
 
-To install Pony, type the following command into the command prompt:
+To install Pony, type the following command into a command prompt:
 
 .. code-block:: text
 
     pip install pony
 
-Pony can be installed on Python 2.7 or Python 3. If you are going to work with SQLite database, you don't need to install anything else. If you wish to use another database, you need to have the access to the database and have the corresponding database driver installed:
+Pony can be installed on Python 2.7 or Python 3. If you are going to work with SQLite databases, you don't need to install anything else. If you wish to use another database, you need to have the access to the database and have the corresponding database driver installed:
 
 * PostgreSQL: `psycopg2 <http://initd.org/psycopg/docs/install.html#installation>`_ or `psycopg2cffi <https://pypi.python.org/pypi/psycopg2cffi>`_
 * MySQL: `MySQL-python <https://pypi.python.org/pypi/MySQL-python/>`_ or `PyMySQL <https://pypi.python.org/pypi/PyMySQL>`_
@@ -25,13 +25,13 @@ To make sure Pony has been successfully installed, launch a Python interpreter i
 
 This imports the entire (and not very large) set of classes and functions necessary for working with Pony. Eventually you can choose what to import, but we recommend using ``import *`` at first.
 
-If you don't want to import everything into global namespace, you can import the ``orm`` package only:
+If you don't want to import everything into the global namespace, you can import the ``orm`` package only:
 
 .. code-block:: python
 
     >>> from pony import orm
 
-In this case you don't load all Pony's functions into the global namespace, but it will require you to use ``orm`` as a prefix to any Pony's function and decorator.
+In this case Pony's functions won't be loaded into the global namespace, but it will require you to use ``orm`` as a prefix for any of Pony's functions and decorators.
 
 The best way to become familiar with Pony is to play around with it in interactive mode. Let's create a sample database containing the entity class ``Person``, add three objects to it, and write a query. 
 
@@ -39,7 +39,11 @@ The best way to become familiar with Pony is to play around with it in interacti
 Creating the database object
 ----------------------------
 
-Entities in Pony are connected to a database. This is why we need to create the database object first. In the Python interpreter, type:
+.. only:: comment
+    What is the proper way to specify a link to the Entity definition?
+    Would it be better to reorder the information, so that Entities are defined in a few sentences, ending with a link to the docs, before they're used in the tutorial?
+
+`Entities <https://docs.ponyorm.org/api_reference.html#entity-definition>`_ in Pony are connected to a database. This is why we need to create the database object first. In the Python interpreter, type:
 
 .. code-block:: python
 
@@ -49,7 +53,13 @@ Entities in Pony are connected to a database. This is why we need to create the 
 Defining entities
 -----------------
 
-Now, let's create two entities -- Person and Car. The entity Person has two attributes -- name and age, and Car has attributes make and model. In the Python interpreter, type the following code:
+Now, let's create two entities -- ``Person`` and ``Car``. The entity ``Person`` has two attributes -- ``name`` and ``age``, and ``Car`` has attributes ``make`` and ``model``. In the Python interpreter, type the following code:
+
+.. only:: comment
+    What's the codestyle for strings? " or '
+    A few paragraphs later, "Car" is used.
+    Black uses double-quotes (")
+    https://black.readthedocs.io/en/stable/the_black_code_style.html#strings
 
 .. code-block:: python
 
@@ -67,15 +77,47 @@ Now, let's create two entities -- Person and Car. The entity Person has two attr
 
 The classes that we have created are derived from the :py:attr:`Database.Entity` attribute of the :py:class:`Database` object. It means that they are not ordinary classes, but entities. The entity instances are stored in the database, which is bound to the ``db`` variable. With Pony you can work with several databases at the same time, but each entity belongs to one specific database.
 
-Inside the entity ``Person`` we have created three attributes -- ``name``, ``age`` and ``cars``. The ``name`` and ``age`` are mandatory attributes. In other words, they these attributes cannot have the ``None`` value. The ``name`` is a string attribute, while ``age`` is numeric.
+Inside the entity ``Person`` we have created three attributes -- ``name``, ``age`` and ``cars``. The ``name`` and ``age`` are mandatory attributes. In other words, these attributes cannot have the ``None`` value. The ``name`` is a string attribute, while ``age`` is numeric.
 
-The ``cars`` attribute is declared as :py:class:`Set` and has the ``Car`` type. This means that this is a relationship. It can keep a collection of instances of the ``Car`` entity. ``"Car"`` is specified as a string here because we didn't declare the entity ``Car`` by that moment yet.
+.. only:: comment
+    Code style: " or ' for ``"Car"``
 
-The ``Car`` entity has three mandatory attributes: ``make`` and ``model`` are strings, and the ``owner`` attribute is the other side of the one-to-many relationship. Relationships in Pony are always defined by two attributes which represent both sides of a relationship.
+The ``cars`` attribute is declared as :py:class:`Set` and references the ``Car`` type. This is a relationship that will be expressed in the database. It can keep a collection of instances of the ``Car`` entity. ``"Car"`` is specified as a string here because the entity ``Car`` had not yet been declared.
 
-If we need to create a many-to-many relationship between two entities, we should declare two :py:class:`Set` attributes at both ends. Pony creates the intermediate database table automatically.
+The ``Car`` entity has three mandatory attributes: ``make`` and ``model`` are strings, and the ``owner`` attribute is the other side of the one-to-many relationship with ``Person``. All relationships in Pony are defined by two attributes, one on each entity, which represent both sides of a relationship.
 
-The ``str`` type is used for representing an unicode string in Python 3. Python 2 has two types for strings - ``str`` and ``unicode``. Starting with the Pony Release 0.6, you can use either ``str`` or ``unicode`` for string attributes, both of them mean an unicode string. We recommend using the ``str`` type for string attributes, because it looks more natural in Python 3.
+If we need to create a many-to-many relationship between two entities, we should declare two :py:class:`Set` attributes on each entity. Pony creates an intermediate database table automatically.
+
+.. only:: comment
+    unicode() is not a function in builtins. Can't find a reference, but this is close:
+    https://docs.python.org/3.0/whatsnew/3.0.html
+
+The ``str`` type is used for representing unicode strings in Python 3. Python 2 has two types for strings - ``str`` and ``unicode``. Starting with the Pony Release 0.6, you can use either ``str`` or ``unicode`` for string attributes: both of them mean unicode strings. We recommend using the ``str`` type for string attributes, since ``unicode`` is not defined in Python 3.
+
+.. only:: comment
+    can show() really take an entity instance?
+    The following code fails in an interactive session:
+    >>> from pony import orm
+    >>> db = orm.Database()
+    >>> class Test(db.Entity):
+    ...  a = orm.Optional(bool)
+    ...
+    >>> db.bind(provider="sqlite", filename=":memory:")
+    >>> db.generate_mapping(create_tables=True)
+    >>> with orm.db_session():
+    ...  test = Test(a=True)
+    ...
+    >>> test
+    Test[1]
+    >>> orm.show(test)
+    instance of Test
+    Traceback (most recent call last):
+    ...
+      File "...\lib\site-packages\pony\orm\core.py", line 6294, in __init__
+        translator = query._translator
+    AttributeError: 'list' object has no attribute '_translator'
+    >>> import pony;pony.__version__
+    '0.7.13'
 
 If you need to check an entity definition in the interactive mode, you can use the :py:func:`show` function. Pass the entity class or the entity instance to this function for printing out the definition:
 
@@ -90,7 +132,13 @@ If you need to check an entity definition in the interactive mode, you can use t
 
 You may notice that the entity got one extra attribute named ``id``. Why did that happen?
 
-Each entity must contain a primary key, which allows distinguishing one entity from the other. Since we have not set the primary key attribute manually, it was created automatically. If the primary key is created automatically, it is named as ``id`` and has a numeric format. If the primary key attribute is created manually, you can specify the name and type of your choice. Pony also supports composite primary keys.
+.. only:: comment
+    Which is correct here? "numeric type" or "numeric format"?
+
+Each entity must contain a primary key, which allows one entity to be distinguished from others. Since we have not set the primary key attribute manually, it was created automatically. If the primary key is created automatically, it is associated with the attribute ``id``, and is given a numeric type. If the primary key attribute is created manually, you can specify the name and type of your choice. Pony also supports composite primary keys.
+
+.. only:: comment
+    Needs a link to: <https://docs.ponyorm.org/api_reference.html#cmdoption-arg-auto>
 
 When the primary key is created automatically, it always has the option ``auto`` set to ``True``. It means that the value for this attribute will be assigned automatically using the database’s incremental counter or a database sequence.
 
@@ -98,23 +146,31 @@ When the primary key is created automatically, it always has the option ``auto``
 Database binding
 ----------------
 
-The database object has the :py:func:`Database.bind()` method. It is used for attaching declared entities to a specific database. If you want to play with Pony in the interactive mode, you can use the SQLite database created in memory:
+The database object has the :py:func:`Database.bind()` method. It is used for attaching declared entities to a specific database. If you have started the interpreter in interactive mode, you can use a SQLite database created in memory:
 
 .. code-block:: python
 
     >>> db.bind(provider='sqlite', filename=':memory:')
 
-Currently Pony supports 5 database types: ``'sqlite'``, ``'mysql'``, ``'postgresql'``, ``'cockroach'`` and ``'oracle'``. The subsequent parameters are specific to each database. They are the same ones that you would use if you were connecting to the database through the DB-API module.
+Currently, Pony supports 5 database types: ``'sqlite'``, ``'postgresql'``, ``'mysql'``, ``'cockroach'``, and ``'oracle'``. The subsequent parameters are specific to each database type. They are the same ones that you would use if you were connecting to the database through the DB-API module.
 
-For SQLite, either the database filename or the string ':memory:' must be specified as the parameter, depending on where the database is being created. If the database is created in-memory, it will be deleted once the interactive session in Python is over. In order to work with the database stored in a file, you can replace the previous line with the following:
+For SQLite, either the database filename or the string ``':memory:'`` must be specified as the value, depending on where the database is being created. If the database is created in-memory, it will be deleted once the interactive session in Python is over. In order to work with a database stored in a file, you can instead use the following:
 
 .. code-block:: python
 
     >>> db.bind(provider='sqlite', filename='database.sqlite', create_db=True)
 
-In this case, if the database file does not exist, it will be created. In our example, we can use a database created in-memory.
+In this case, if the database file does not exist, it will be created. For this tutorial, we can use a database created in-memory.
 
-If you're using another database, you need to have the specific database adapter installed. For PostgreSQL Pony uses psycopg2. For MySQL either MySQLdb or pymysql adapter. For Oracle Pony uses the cx_Oracle adapter.
+.. only:: comment
+    These adapters need links
+    psycopg2: <https://pypi.org/project/psycopg2/>
+    MySQLdb: <https://sourceforge.net/projects/mysql-python/> or <https://github.com/PyMySQL/mysqlclient-python>
+    pymysql: <https://github.com/PyMySQL/PyMySQL>
+    cx_Oracle: <https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html>
+    Does cockroachDB not need an adapter? If so, this should be explicitly mentioned.
+
+If you're using another database, you need to have the specific database adapter installed. For PostgreSQL Pony uses ``psycopg2``. For MySQL, either ``MySQLdb`` or ``pymysql`` adapter. For Oracle, Pony uses the ``cx_Oracle`` adapter.
 
 Here is how you can get connected to the databases:
 
@@ -148,7 +204,7 @@ Now we need to create database tables where we will persist our data. For this p
 
 The parameter ``create_tables=True`` indicates that, if the tables do not already exist, then they will be created using the ``CREATE TABLE`` command.
 
-All entities connected to the database must be defined before calling :py:meth:`~Database.generate_mapping` method.
+All entities connected to the database must be defined before calling the :py:meth:`~Database.generate_mapping` method.
 
 
 Using the debug mode
