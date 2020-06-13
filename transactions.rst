@@ -30,9 +30,13 @@ Example of using the :py:func:`@db_session` decorator:
 
 Example of using the :py:func:`db_session` context manager:
 
+.. only:: comment
+    Where does ``username`` come from?
+    Does the change work?
+
 .. code-block:: python
 
-    def process_request():
+    def process_request(username):
         ...
         with db_session:
             u = User.get(username=username)
@@ -122,21 +126,26 @@ Pony caches data at several stages for increasing performance. It caches:
 Using db_session with generator functions or coroutines
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. only:: comment
+    Should use official pydoc explanation, or at least link to it
 
-The :py:func:`@db_session` decorator can be used with generator functions or coroutines too. The generator function is the function that contains the ``yield`` keyword inside it. The coroutine is a function which is defined using the ``async def`` or decorated with ``@asyncio.coroutine``.
+The :py:func:`@db_session` decorator can be used with generator functions or coroutines too. A generator is a function that contains the ``yield`` keyword inside it. A coroutine is a function which is defined using ``async def`` or decorated with ``@asyncio.coroutine``.
 
-If inside such a generator function or coroutine you'll try to use the ``db_session`` context manager, it will not work properly, because in Python context managers cannot intercept generator suspension. Instead, you need to wrap you generator function or coroutine with the ``@db_session`` decorator.
+If inside such a generator function or coroutine you try to use the ``db_session`` context manager, it will not work properly, because in Python, context managers cannot intercept generator suspension. Instead, you need to wrap you generator function or coroutine with the ``@db_session`` decorator.
 
 In other words, don't do this:
 
 .. code-block:: python
 
     def my_generator(x):
-        with db_session: # it won't work here!
+        with db_session: # transaction will never end
             obj = MyEntity.get(id=x)
             yield obj
 
 Do this instead:
+
+.. only:: comment
+    Any reason for inconsistent formatting
 
 .. code-block:: python
 
@@ -160,7 +169,7 @@ In essence, here is the difference when using :py:func:`db_session` with generat
 Parameters of db_session
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-As it was mentioned above :py:func:`db_session` can be used as a decorator or a context manager. It can receive parameters which are described in the :ref:`API Reference <db_session>`.
+As mentioned above, :py:func:`db_session` can be used as a decorator or a context manager. It can receive parameters which are described in the :ref:`API Reference <db_session>`.
 
 
 
@@ -210,7 +219,7 @@ Also there are three corresponding functions of the :py:class:`Database` object:
 * :py:meth:`Database.rollback`
 * :py:meth:`Database.flush`
 
-If you work with one database, there is no difference between using an upper level or the :py:class:`Database` object methods.
+If you work with one database, there is no difference between using the upper level function or the :py:class:`Database` object methods.
 
 .. _optimistic_control:
 
@@ -227,7 +236,7 @@ What should we do with this situation? First of all, this behavior is normal for
 
 The current transaction rolls back, but it can be restarted. In order to restart the transaction automatically, you can use the ``retry`` parameter of the :py:func:`db_session` decorator (see more details about it later in this chapter).
 
-How Pony does the optimistic check? For this purpose Pony tracks access to attributes of each object. If the user’s code reads or modifies an object’s attribute, Pony then will check if this attribute value remains the same in the database on commit. This approach guarantees that there will be no lost updates, the situation when during the current transaction another transaction changed the same object and then our transaction overrides the data without knowing there were changes.
+Pony performs this optimistic check by tracking access to attributes of each object. If code reads or modifies an object’s attribute, Pony will then check if this attribute value is unchanged in the database before committing. This approach guarantees that there will be no lost updates. Take for example the situation where, during the current transaction, another transaction changes the same object after the current transaction reads it, but before the transaction i committed. Without optimistic checking the current transaction overwrites the data without knowing there were changes.
 
 During the optimistic check Pony verifies only those attributes which were read or written by the user. Also when Pony updates an object, it updates only those attributes which were changed by the user. This way it is possible to have two concurrent transactions which change different attributes of the same object and both of them succeed.
 
@@ -255,7 +264,7 @@ If you need to lock a single object, you can use the ``get_for_update`` method o
 
     Product.get_for_update(id=123)
 
-When you trying to lock an object using :py:meth:`~Query.for_update` and it is already locked by another transaction, your request will need to wait until the row-level lock is released. To prevent the operation from waiting for other transactions to commit, use the ``nowait=True`` option:
+When trying to lock an object using :py:meth:`~Query.for_update` that is already locked by another transaction, your request will need to wait until the row-level lock is released. To prevent the operation from waiting for other transactions to commit, use the ``nowait=True`` option:
 
 .. code-block:: python
 
@@ -263,9 +272,13 @@ When you trying to lock an object using :py:meth:`~Query.for_update` and it is a
     # or
     Product.get_for_update(id=123, nowait=True)
 
+.. only:: comment
+    What error message is raised?
+    Can it be caught in a try/except block?
+
 In this case, if a selected row(s) cannot be locked immediately, the request reports an error, rather than waiting.
 
-The main disadvantage of pessimistic locking is performance degradation because of the expense of database locks and limiting concurrency.
+The main disadvantage of pessimistic locking is performance degradation from using database locks and limiting concurrency.
 
 
 How Pony avoids lost updates
@@ -275,56 +288,74 @@ Lower isolation levels increase the ability of many users to access data at the 
 
 Let’s consider an example. Say we have two accounts. We need to provide a function which can transfer money from one account to another. During the transfer we check if the account has enough funds.
 
-Let’s say we are using Django ORM for this task. Below if one of the possible ways of implementing such a function:
+Let’s say we are using Django ORM for this task. Below is one of the possible ways of implementing such a function:
+
+.. code-block:: python
+
+    def transfer_money(from_account_id, to_account_id, amount):
+        from_account = Account.objects.get(pk=from_account_id)
+        to_account = Account.objects.get(pk=to_account_id)
+        if amount > from_account.amount:    # validation
+            raise ValueError("Not enough funds")
+        from_account.amount -= amount
+        from_account.save()
+        to_account.amount += amount
+        to_account.save()
+
+
+By default in Django, each ``save()`` is performed in a separate transaction. If after the first ``save()`` there is a failure, the transaction won't be completed, and the money debited from the ``from_account`` will disappear. Even if no failure is encountered, if another transaction gets the ``to_account`` statement in between the two ``save()`` operations, the result will be wrong. To avoid such problems, both operations should be combined into one transaction. We can do that by decorating the function with the ``@transaction.atomic`` decorator.
 
 .. code-block:: python
 
     @transaction.atomic
-    def transfer_money(account_id1, account_id2, amount):
-        account1 = Account.objects.get(pk=account_id1)
-        account2 = Account.objects.get(pk=account_id2)
-        if amount > account1.amount:    # validation
+    def transfer_money(from_account_id, to_account_id, amount):
+        from_account = Account.objects.get(pk=from_account_id)
+        to_account = Account.objects.get(pk=to_account_id)
+        if amount > from_account.amount:    # validation
             raise ValueError("Not enough funds")
-        account1.amount -= amount
-        account1.save()
-        account2.amount += amount
-        account2.save()
+        from_account.amount -= amount
+        from_account.save()
+        to_account.amount += amount
+        to_account.save()
 
 
-By default in Django, each ``save()`` is performed in a separate transaction. If after the first ``save()`` there will be a failure, the amount will just disappear. Even if there will be no failure, if another transaction will try to get the account statement in between of two ``save()`` operations, the result will be wrong. In order to avoid such problems, both operations should be combined in one transaction. We can do that by decorating the function with the ``@transaction.atomic`` decorator.
+But even in this case we can encounter a problem. If two bank branches try to transfer the full amount to different accounts at the same time, both operations will be performed. Each function will pass the validation and finally one transaction will override the results of another one. This anomaly is called a "lost update".
 
-But even in this case we can encounter a problem. If two bank branches will try to transfer the full amount to different accounts at the same time, both operations will be performed. Each function will pass the validation and finally one transaction will override the results of another one. This anomaly is called “lost update”.
-
-There are three ways to prevent such anomaly:
+There are three ways to prevent such an anomaly:
 
 * Use the SERIALIZABLE isolation level
 * Use SELECT FOR UPDATE instead SELECT
 * Use optimistic checks
 
-If you use the SERIALIZABLE isolation level, the database will not allow to commit the second transaction by throwing an exception during commit. The disadvantage of such approach is that this level requires more system resources.
+If you use the SERIALIZABLE isolation level, the database will not allow the second transaction to be committed, and will throw an exception upon calling ``commit()``. The disadvantage of such an approach is that this level requires more system resources.
 
-If you use SELECT FOR UPDATE then the transaction which hits the database first will lock the row and another transaction will wait.
+If you use SELECT FOR UPDATE then the transaction which hits the database first will lock the row and all other transactions modifying the same row will be forced to wait.
 
 The optimistic check doesn’t require more system resources and doesn’t lock the database rows. It eliminates the lost update anomaly by ensuring that the data wasn’t changed between the moment when we read it from the database and the commit operation.
 
-The only way to avoid the lost update anomaly in Django is using the SELECT FOR UPDATE and you should use it explicitly. If you forget to do that or if you don’t realize that the problem of lost update exists with your business logic, your data can be lost.
+The only way to avoid the lost update anomaly in Django is by using SELECT FOR UPDATE, which you should use explicitly. If you forget to do that, or if you don’t realize that your business logic could potentially encounter this lost update problem, your data can be lost.
 
-Pony allows using all three approaches, having the third one, optimistic checks, turned on by default. This way Pony avoids the lost update anomaly completely. Also using the optimistic checks allows the highest concurrency because it doesn’t lock the database and doesn’t require extra resources.
+Pony allows using all three approaches, having the third one, optimistic checks, used by default. This way Pony avoids the lost update anomaly completely. Also using the optimistic checks allows the highest concurrency because it doesn’t lock the database and doesn’t require extra resources.
 
-The similar function for transferring money would look this way in Pony:
+.. only:: comment
+    In database terminology, what is the name for the general class of
+    what is being discussed here? "atomicity techniques", "contention
+    detection", "concurrency guards"?
+
+A similar function to transfer money can be written using Pony. This is what it would look like using all three available techniques.
 
 The SERIALIZABLE approach:
 
 .. code-block:: python
 
     @db_session(serializable=True)
-    def transfer_money(account_id1, account_id2, amount):
-        account1 = Account[account_id1]
-        account2 = Account[account_id2]
-        if amount > account1.amount:
+    def transfer_money(from_account_id, to_account_id, amount):
+        from_account = Account[from_account_id]
+        to_account   = Account[to_account_id  ]
+        if amount > from_account.amount:
             raise ValueError("Not enough funds")
-        account1.amount -= amount
-        account2.amount += amount
+        from_account.amount -= amount
+        to_account.amount   += amount
 
 
 The SELECT FOR UPDATE approach:
@@ -332,13 +363,13 @@ The SELECT FOR UPDATE approach:
 .. code-block:: python
 
     @db_session
-    def transfer_money(account_id1, account_id2, amount):
-        account1 = Account.get_for_update(id=account_id1)
-        account2 = Account.get_for_update(id=account_id2)
-        if amount > account1.amount:
+    def transfer_money(from_account_id, to_account_id, amount):
+        from_account = Account.get_for_update(id=from_account_id)
+        to_account   = Account.get_for_update(id=to_account_id  )
+        if amount > from_account.amount:
             raise ValueError("Not enough funds")
-        account1.amount -= amount
-        account2.amount += amount
+        from_account.amount -= amount
+        to_account.amount   += amount
 
 The optimistic check approach:
 
@@ -366,14 +397,28 @@ See the :ref:`API Reference <transaction_isolation_levels>` for more details on 
 Handling disruptions
 --------------------
 
-On ``db.bind(...)`` Pony opens connection to the database and then store it in a thread-local connection pool.
+On ``db.bind(...)`` Pony opens a connection to the database and then stores it in a thread-local connection pool.
 
-When application code enters db_session and makes a query, Pony takes already opened connection from the pool and use it. After exiting db_session, connection is returned to the pool. If you enable logging, you will see ``RELEASE CONNECTION`` message from Pony. It means that the connection is not closed, but was returned to the connection pool.
+When application code enters a database session (i.e. ``with db_session:`` context manager, or ``@db_session`` decorator), and makes a query, Pony takes any already opened connection from the pool and uses it. After exiting the database session, the connection is returned to the pool. If you enable logging, you will see a ``RELEASE CONNECTION`` message from Pony when this happens. This means that the connection was not closed, but was returned to the connection pool.
 
-Sometimes connection is closed by database server, for example when database server was restarted. After that a previously opened connection becomes invalid. If such disconnect happens, most probably it was between db_sessions, but sometimes it may happens right during active db_session. Pony is prepared to such situations, and may reconnect to the database in an intelligent matter.
+Sometimes a connection is closed by the database server. For example, when the database server is restarted. After that, any previously opened connection becomes invalid. If such a disconnect happens, it will most probably occure between database sessions, but sometimes it may happens during an active database session. Pony is prepared for such situations, and will reconnect to the database in an intelligent matter.
 
-If Pony executes a query and receive an error that connection is closed, it check the state of db_session in order to know was any updates already sent to the database during current db_session. If db_session just started, or all queries were just SELECTs, Pony assumes it is safe to re-open connection under the hood and continue the same db_session as if nothing unusual is happened. But if some updates were already sent to the database during active db_session before the previous connection becomes invalid, it means these updates are lost, and it is impossible to continue this db_session. Then Pony throws an exception.
+.. only:: comment
+    Where it says "just started", is that a time-based
+    check, or does it check to see if a transaction was started?
+    If ``time.sleep()`` is called in the db_session context, will
+    the transaction be marked as invalid?
 
-But in most cases Pony is able to reconnect silently so application code don't notice anything.
+.. only:: comment
+    Which exception does pony throw when a db_session
+    becomes invalid?
 
-If you want to close connection which is stored in the connection pool, you can perform ``db.disconnect()`` call, see :py:meth:`~Database.disconnect`. In multi-threaded application this needs to be done in each thread separately.
+If Pony attempts to execute a query, but receives an error because the connection was closed, it checks the state of database session to determine if any updates were already sent to the database during the current database session. If the database session was just started, or all queries were just SELECTs, Pony assumes it is safe to re-open the connection, and continues the same database session without interrupting the application code. But if some updates were already sent to the database during this session, and then the connection is closed, those updates were lost, and it is impossible to continue the database session. In this case, Pony throws an exception.
+
+But in most cases Pony is able to reconnect silently without disrupting application code.
+
+.. only:: comment
+    Can the link to Database.disonnect() be given with the link text "db.disconnect()",
+    as opposed to parenthetically?
+
+If you want to close a connection that is stored in the connection pool, you can call ``db.disconnect()`` (see :py:meth:`~Database.disconnect`). In multi-threaded applications this needs to be done in each thread separately.

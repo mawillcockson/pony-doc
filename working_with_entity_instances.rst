@@ -7,16 +7,20 @@ Creating an entity instance
 
 Creating an entity instance in Pony is similar to creating a regular object in Python:
 
+.. only:: comment
+    We should probably use RFC 6761 annd RFC 2606 domain names
+    indicated for use in documentation
+
 .. code-block:: python
 
    customer1 = Customer(login="John", password="***",
-                        name="John", email="john@google.com")
+                        name="John", email="john@example.com")
 
-When creating an object in Pony, all the parameters should be specified as keyword arguments. If an attribute has a default value, you can omit it.
+When creating an object in Pony, all the parameters should be specified as keyword arguments. If an attribute has a default value, it can be omitted.
 
-All created instances belong to the current :py:func:`db_session`. In some object-relational mappers, you are required to call an object's ``save()`` method in order to save it. This is inconvenient, as a programmer must track which objects were created or updated, and must not forget to call the ``save()`` method on each object.
+All created instances belong to the current :py:func:`db_session`. Some object-relational mappers require an object's ``save()`` method to be called in order to save it. This is inconvenient, as each updated and changed object must be tracked and have its ``save()`` method called.
 
-Pony tracks which objects were created or updated and saves them in the database automatically when current :py:func:`db_session` is over. If you need to save newly created objects before leaving the :py:func:`db_session` scope, you can do so by using the :py:func:`flush` or :py:func:`commit` functions.
+Pony tracks which objects were created or updated and saves them in the database automatically when the current :py:func:`db_session` is over. If newly-created objects need to be saved before leaving the :py:func:`db_session` scope, the :py:func:`flush` or :py:func:`commit` functions can be called to ensure this happens.
 
 
 Loading objects from the database
@@ -25,7 +29,7 @@ Loading objects from the database
 Getting an object by primary key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The simplest case is when we want to retrieve an object by its primary key. To accomplish this in Pony, the user simply needs to put the primary key in square brackets, after the class name. For example, to extract a customer with the primary key value of 123, we can write:
+The simplest case is when we want to retrieve an object by its primary key. To accomplish this in Pony, while in the context of a :py:func:`db_session` the user simply needs to put the primary key in square brackets, after the class name. For example, to extract a customer with the primary key value of ``123``, we can write:
 
 .. code-block:: python
 
@@ -35,31 +39,68 @@ The same syntax also works for objects with composite keys; we just need to list
 
 .. code-block:: python
 
+   class OrderItem(db.Entity):
+       order = Required("Order")
+       product = Required("Product")
+
    order_item = OrderItem[order1, product1]
 
-Pony raises the ``ObjectNotFound`` exception if object with such primary key doesn't exist.
+Pony raises the ``ObjectNotFound`` exception if no object with such a primary key exists.
 
 
 Getting one object by unique combination of attributes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to retrieve one object not by its primary key, but by another combination of attributes, you can use the :py:meth:`~Entity.get` method of an entity. In most cases, it is used for getting an object by the secondary unique key, but it can also be used to search by any other combination of attributes. As a parameter of the :py:meth:`~Entity.get` method, you need to specify the names of the attributes and their values. For example, if you want to receive a product under the name "Product 1", and you believe that database has only one product under this name, you can write:
+.. only:: comment
+    I'm still unsure about second-to-last sentence. Could also be:
+    Parameters of the :py:meth:`~Entity.get` method are specified as the names of the attributes and values of the requested ``Entity`` object.
+
+If you want to retrieve one object not by its primary key, but by another combination of attributes, you can use the :py:meth:`~Entity.get` method of an entity.
+In most cases, it is used for getting an object by the secondary unique key, but it can also be used to search by any other combination of attributes.
+The :py:meth:`~Entity.get` method takes only keyword arguments, with the keywords and values used as matching criteria against attribute names and their values.
+For example, if you want to retrieve a product with a name attribute of ``"Product 1"``, and you believe that the database has only one product with this name, you can write:
 
 .. code-block:: python
 
-   product1 = Product.get(name='Product1')
+   product1 = Product.get(name='Product 1')
 
-If no object is found, :py:meth:`~Entity.get` returns ``None``. If multiple objects are found, ``MultipleObjectsFoundError`` exception is raised.
+If no object is found, :py:meth:`~Entity.get` returns ``None``. If multiple objects are found, the ``MultipleObjectsFoundError`` exception is raised.
 
-You may want to use the :py:meth:`~Entity.get` method with primary key when we want to get ``None`` instead of ``ObjectNotFound`` exception if the object does not exists in database.
+It might be useful to use the :py:meth:`~Entity.get` method with the primary key or a unique key and check for ``None``, to avoid an ``ObjectNotFound`` exception being raised if the object does no exist in the database.
 
-Method :py:meth:`~Entity.get` can also receive a lambda function as a single positioning argument. This method returns an instance of an entity, and not an object of the :py:class:`Query` class.
+The :py:meth:`~Entity.get` method also takes a lambda function as a single positional argument:
+
+.. code-block:: python
+
+   class Product(db.Entity):
+        name = Required(str, unique=True)
+        price = Required(Decimal)
+        description = Optional(str)
+        picture = Optional(bytes)
+        quantity = Require(int)
+    
+    product = Product.get(lambda p: p.price == 3 and p.description)
+
+.. only:: comment
+    None of the examples return an object of the Query class,
+    instead raising MultipleObjectsFoundError.
+
+This form returns an instance of an :py:attr:`~Database.Entity`, and not an object of the :py:class:`Query` class.
 
 
 Getting several objects
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to retrieve several objects from a database, you should use the :py:meth:`~Entity.select()` method of an entity. Its argument is a lambda function, which has a single parameter, symbolizing an instance of an object in the database. Inside this function, you can write conditions, by which you want to select objects. For example, if you want to find all products with the price higher than 100, you can write:
+.. only:: comment
+    How do I insert a link for ``filter()`` to the external pydocs while maintaining
+    the formatting?
+    https://docs.python.org/3/library/functions.html#filter
+
+In order to retrieve several objects from a database, you should use the :py:meth:`~Entity.select()` method of an entity.
+In one form, it can take a single, positional lambda function that itself has only a single parameter.
+Conceptually, this lambda is passed an entity and is expected to return ``True`` if the object matches the search criteria.
+This behaviour matches the builtin function ``filter()``.
+For example, if you want to find all products with a price higher than 100, you can write:
 
 .. code-block:: python
 
@@ -74,14 +115,14 @@ This lambda function will not be executed in Python. Instead, it will be transla
     FROM "Product" "p"
     WHERE "p"."price" > 100
 
-The :py:meth:`~Entity.select()` method returns an instance of the :py:class:`Query` class. If you start iterating over this object, the SQL query will be sent to the database and you will get the sequence of entity instances. For example, this is how you can print out all product names and it's price:
+The :py:meth:`~Entity.select()` method returns an instance of the :py:class:`Query` class. If you start iterating over this object, the SQL query will be sent to the database and you will get the sequence of entity instances. For example, this is how you can print out all of the matching products' names and prices:
 
 .. code-block:: python
 
     for p in Product.select(lambda p: p.price > 100):
         print(p.name, p.price)
 
-If you don't want to iterate over a query, but need just to get a list of objects, you can do so this way:
+If you don't want to iterate over a query, and need just a list of entity objects, you can do so like this:
 
 .. code-block:: python
 
@@ -98,16 +139,16 @@ Here we get a full slice ``[:]`` from the query. This is an equivalent of conver
 Using parameters in queries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use variables in queries. Pony will pass those variables as parameters to the SQL query. One important advantage of declarative query syntax in Pony is that it offers full protection from SQL-injections, as all external parameters will be properly escaped.
+You can use variables in queries. Pony will pass those variables as parameters to the SQL query. One important advantage that the declarative query syntax in Pony offers is full protection from SQL-injections, as all external parameters will be properly escaped.
 
-Here is the example:
+Here is an example:
 
 .. code-block:: python
 
     x = 100
     products = Product.select(lambda p: p.price > x)
 
-The SQL query which will be generated will look this way:
+This will generate a SQL query that looks like this:
 
 .. code-block:: sql
 
@@ -122,7 +163,7 @@ This way the value of ``x`` will be passed as the SQL query parameter, which com
 Sorting query results
 ~~~~~~~~~~~~~~~~~~~~~
 
-If you need to sort objects in a certain order, you can use the :py:meth:`Query.order_by` method.
+If you need to sort objects in a certain order, you can use the :py:meth:`Query.order_by` method. For example:
 
 .. code-block:: python
 
@@ -130,7 +171,7 @@ If you need to sort objects in a certain order, you can use the :py:meth:`Query.
 
 In this example, we display names and prices of all products with price higher than 100 in a descending order.
 
-The methods of the :py:class:`Query` object modify the SQL query which will be sent to the database. Here is the SQL generated for the previous example:
+The methods of the :py:class:`Query` object returned by the :py:meth:`~Entity.select` method modify the SQL query which will be sent to the database. Here is the SQL generated for the previous example:
 
 .. code-block:: sql
 
@@ -146,7 +187,7 @@ The :py:meth:`Query.order_by` method can also receive a lambda function as a par
 
    Product.select(lambda p: p.price > 100).order_by(lambda p: desc(p.price))
 
-Using the lambda function inside the .. code-block:: python method allows using advanced sorting expressions. For example, this is how you can sort our customers by the total price of their orders in the descending order:
+Using the lambda function inside the :py:meth:`~Query.select` method allows using advanced sorting expressions. For example, this is how you can sort customers by the total price of their orders, in descending order:
 
 .. code-block:: python
 
@@ -158,13 +199,13 @@ In order to sort the result by several attributes, you need to separate them by 
 
     Product.select(lambda p: p.price > 100).order_by(desc(Product.price), Product.name)
 
-The same query, but using lambda function will look this way:
+The same query using a lambda function would look like this:
 
 .. code-block:: python
 
     Product.select(lambda p: p.price > 100).order_by(lambda p: (desc(p.price), p.name))
 
-Note that according to Python syntax, if you return more than one element from lambda, you need to put them into parenthesis.
+Note that in Python, in order to return more than one element from a lambda expression, the values can be placed in a tuple (e.g. ``(value1, value2, value3)``). In this case, the lambda function is returning a tuple of ``desc(p.price)`` and ``p.name``.
 
 
 Limiting the number of selected objects

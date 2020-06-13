@@ -103,18 +103,18 @@ The specifics of the symmetrical relationship is that the entity has just one re
 Multiple relationships between two entities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When two entities have more than one relationship between them, Pony requires the reverse attributes to be specified. This is needed in order to let Pony know which pair of attributes are related to each other. Let’s consider the data diagram where a user can write tweets and also can favorite them:
+When two entities have more than one relationship between them, Pony requires the reverse attributes to be specified. This is needed in order to let Pony know which pair of attributes are related to each other. Let’s consider the data diagram where a user can write posts and also can favorite them:
 
 .. code-block:: python
 
    class User(db.Entity):
-       tweets = Set("Tweet", reverse="author")
+       posts = Set("Post", reverse="author")
        favorites = Set("Tweet", reverse="favorited")
 
-   class Tweet(db.Entity):
-       author = Required(User, reverse="tweets")
+   class Post(db.Entity):
+       author = Required(User, reverse="posts")
        favorited = Set(User, reverse="favorites")
 
-In the example above we have to specify the option ``reverse``. If you will try to generate mapping for the entities definition without the ``reverse`` specified, you will get the exception ``pony.orm.core.ERDiagramError``: ``"Ambiguous reverse attribute for Tweet.author"``. That happens because in this case the attribute ``author`` can technically relate either to the attribute ``tweets`` or to ``favorites`` and Pony has no information on which one to use.
+In the example above we have to specify the option ``reverse``. If you will try to generate mapping for the entities definition without the ``reverse`` specified, you will get the exception ``pony.orm.core.ERDiagramError``: ``"Ambiguous reverse attribute for Post.author"``. That happens because in this case the attribute ``author`` can technically relate either to the attribute ``posts`` or to ``favorites`` and Pony has no information on which one to use.
 
 
